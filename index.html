@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Mughni & Fadhil - Voice Note</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #f5eee8;
+      color: #4b1f24;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 500px;
+      background: #fffaf5;
+      border-radius: 22px;
+      padding: 25px;
+      text-align: center;
+      box-shadow: 0 5px 25px #0002;
+    }
+
+    h1 {
+      font-family: Georgia, serif;
+      margin: 8px 0;
+    }
+
+    .sub {
+      color: #80676a;
+      margin-bottom: 25px;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      border: 0;
+      border-radius: 12px;
+      margin-top: 10px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      background: #7b1e2b;
+      color: white;
+    }
+
+    button.alt {
+      background: #eadbd6;
+      color: #4b1f24;
+    }
+
+    #recording {
+      display: none;
+      margin: 15px 0;
+      color: #a30000;
+      font-weight: bold;
+    }
+
+    #status {
+      margin-top: 15px;
+      font-size: 14px;
+    }
+
+    audio {
+      width: 100%;
+      margin-top: 15px;
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="card">
+
+  <div style="font-size:45px">💍</div>
+
+  <h1>Mughni & Fadhil</h1>
+
+  <div class="sub">
+    Voice Note Pernikahan
+  </div>
+
+  <button id="recordBtn">
+    🎙️ Mulai Rekam
+  </button>
+
+  <div id="recording">
+    🔴 Sedang merekam...
+  </div>
+
+  <audio id="audio" controls></audio>
+
+  <button id="resetBtn" class="alt" style="display:none">
+    🔄 Rekam Ulang
+  </button>
+
+  <div id="status">
+    Tekan "Mulai Rekam" untuk memberikan izin mikrofon.
+  </div>
+
+</div>
+
+<script>
+
+let mediaRecorder = null;
+let audioChunks = [];
+let audioBlob = null;
+
+const recordBtn = document.getElementById("recordBtn");
+const resetBtn = document.getElementById("resetBtn");
+const recording = document.getElementById("recording");
+const audio = document.getElementById("audio");
+const status = document.getElementById("status");
+
+recordBtn.addEventListener("click", async function () {
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+
+    status.textContent =
+      "❌ Browser tidak mendukung akses mikrofon atau halaman belum menggunakan HTTPS.";
+
+    return;
+  }
+
+  try {
+
+    const stream =
+      await navigator.mediaDevices.getUserMedia({
+        audio: true
+      });
+
+    audioChunks = [];
+
+    mediaRecorder = new MediaRecorder(stream);
+
+    mediaRecorder.ondataavailable = function (event) {
+
+      if (event.data.size > 0) {
+        audioChunks.push(event.data);
+      }
+
+    };
+
+    mediaRecorder.onstop = function () {
+
+      stream.getTracks().forEach(function (track) {
+        track.stop();
+      });
+
+      audioBlob = new Blob(audioChunks, {
+        type: mediaRecorder.mimeType || "audio/webm"
+      });
+
+      audio.src = URL.createObjectURL(audioBlob);
+      audio.style.display = "block";
+
+      recording.style.display = "none";
+
+      recordBtn.style.display = "none";
+      resetBtn.style.display = "block";
+
+      status.textContent =
+        "✅ Rekaman selesai. Silakan tekan Play untuk mendengarkan.";
+
+    };
+
+    mediaRecorder.start();
+
+    recordBtn.textContent = "⏹️ Berhenti Rekam";
+
+    recording.style.display = "block";
+
+    status.textContent = "Mikrofon aktif.";
+
+    recordBtn.onclick = function () {
+
+      if (mediaRecorder &&
+          mediaRecorder.state === "recording") {
+
+        mediaRecorder.stop();
+
+      }
+
+    };
+
+  } catch (error) {
+
+    console.error(error);
+
+    status.textContent =
+      "❌ Mikrofon tidak dapat digunakan. Error: " +
+      error.name;
+
+  }
+
+});
+
+resetBtn.addEventListener("click", function () {
+
+  audioBlob = null;
+
+  audioChunks = [];
+
+  audio.removeAttribute("src");
+  audio.style.display = "none";
+
+  resetBtn.style.display = "none";
+  recordBtn.style.display = "block";
+
+  recordBtn.textContent = "🎙️ Mulai Rekam";
+
+  status.textContent =
+    "Tekan 'Mulai Rekam' untuk merekam ulang.";
+
+});
+
+</script>
+
+</body>
+</html>
