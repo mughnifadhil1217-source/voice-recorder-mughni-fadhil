@@ -117,6 +117,7 @@
 let mediaRecorder = null;
 let audioChunks = [];
 let audioBlob = null;
+let currentStream = null;
 
 const recordBtn = document.getElementById("recordBtn");
 const resetBtn = document.getElementById("resetBtn");
@@ -124,30 +125,58 @@ const recording = document.getElementById("recording");
 const audio = document.getElementById("audio");
 const status = document.getElementById("status");
 
+function getSupportedMimeType() {
+  const types = [
+    "audio/mp4",
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus"
+  ];
+
+  for (const type of types) {
+    if (window.MediaRecorder &&
+        MediaRecorder.isTypeSupported &&
+        MediaRecorder.isTypeSupported(type)) {
+      return type;
+    }
+  }
+
+  return "";
+}
+
 recordBtn.addEventListener("click", async function () {
 
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+  if (!navigator.mediaDevices ||
+      !navigator.mediaDevices.getUserMedia) {
 
     status.textContent =
-      "❌ Browser tidak mendukung akses mikrofon atau halaman belum menggunakan HTTPS.";
+      "❌ Browser tidak mendukung akses mikrofon.";
 
     return;
   }
 
   try {
 
-    const stream =
+    currentStream =
       await navigator.mediaDevices.getUserMedia({
-        audio: true
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
       });
 
     audioChunks = [];
 
-    mediaRecorder = new MediaRecorder(stream);
+    const mimeType = getSupportedMimeType();
+
+    mediaRecorder = mimeType
+      ? new MediaRecorder(currentStream, { mimeType })
+      : new MediaRecorder(currentStream);
 
     mediaRecorder.ondataavailable = function (event) {
 
-      if (event.data.size > 0) {
+      if (event.data && event.data.size > 0) {
         audioChunks.push(event.data);
       }
 
@@ -155,12 +184,17 @@ recordBtn.addEventListener("click", async function () {
 
     mediaRecorder.onstop = function () {
 
-      stream.getTracks().forEach(function (track) {
-        track.stop();
-      });
+      if (currentStream) {
+        currentStream.getTracks().forEach(function (track) {
+          track.stop();
+        });
+      }
+
+      const type =
+        mediaRecorder.mimeType || mimeType || "audio/mp4";
 
       audioBlob = new Blob(audioChunks, {
-        type: mediaRecorder.mimeType || "audio/webm"
+        type: type
       });
 
       audio.src = URL.createObjectURL(audioBlob);
@@ -172,36 +206,52 @@ recordBtn.addEventListener("click", async function () {
       resetBtn.style.display = "block";
 
       status.textContent =
-        "✅ Rekaman selesai. Silakan tekan Play untuk mendengarkan.";
+        "✅ Rekaman selesai. Tekan Play untuk mendengarkan.";
 
     };
 
-    mediaRecorder.start();
+    mediaRecorder.onerror = function () {
+
+      status.textContent =
+        "❌ Terjadi masalah saat merekam.";
+
+      recording.style.display = "none";
+
+    };
+
+    mediaRecorder.start(250);
 
     recordBtn.textContent = "⏹️ Berhenti Rekam";
 
     recording.style.display = "block";
 
-    status.textContent = "Mikrofon aktif.";
-
-    recordBtn.onclick = function () {
-
-      if (mediaRecorder &&
-          mediaRecorder.state === "recording") {
-
-        mediaRecorder.stop();
-
-      }
-
-    };
+    status.textContent =
+      "🎙️ Mikrofon aktif. Silakan berbicara.";
 
   } catch (error) {
 
     console.error(error);
 
+    if (currentStream) {
+      currentStream.getTracks().forEach(function (track) {
+        track.stop();
+      });
+    }
+
     status.textContent =
-      "❌ Mikrofon tidak dapat digunakan. Error: " +
+      "❌ Mikrofon tidak dapat digunakan: " +
       error.name;
+
+  }
+
+});
+
+recordBtn.addEventListener("click", function () {
+
+  if (mediaRecorder &&
+      mediaRecorder.state === "recording") {
+
+    mediaRecorder.stop();
 
   }
 
@@ -210,10 +260,12 @@ recordBtn.addEventListener("click", async function () {
 resetBtn.addEventListener("click", function () {
 
   audioBlob = null;
-
   audioChunks = [];
 
+  audio.pause();
   audio.removeAttribute("src");
+  audio.load();
+
   audio.style.display = "none";
 
   resetBtn.style.display = "none";
@@ -225,7 +277,6 @@ resetBtn.addEventListener("click", function () {
     "Tekan 'Mulai Rekam' untuk merekam ulang.";
 
 });
-
 </script>
 
 </body>
